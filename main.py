@@ -41,8 +41,8 @@ df = pd.read_excel(INPUT_FILENAME, header=None, sheet_name='Internal')
 rounds_row_pos = (7, 8)
 commander_column_pos = (0, 8)
 
-victorious_commander_row = 4
-defeated_commander_row = 5
+victorious_commander_row = 5
+defeated_commander_row = 6
 
 rounds = df.iloc[rounds_row_pos[0]][rounds_row_pos[1]:]
 events = list(rounds.index[rounds == 'R1'])
@@ -58,10 +58,8 @@ rounds_indexes = [round_index for event_rounds in reversed(
 
 commanders = df[commander_column_pos[0]][commander_column_pos[1]:]
 
+ratings_history = []
 ratings = {}
-
-output_table_mu = []
-output_table_sigma = []
 
 for round_no, round_index in enumerate(rounds_indexes):
     victor_team = []
@@ -69,8 +67,20 @@ for round_no, round_index in enumerate(rounds_indexes):
 
     draw = False
 
-    victorious_commander = df.iloc[victorious_commander_row, round_index]
-    defeated_commander = df.iloc[defeated_commander_row, round_index]
+    victorious_commander = '[COMMANDER]' + df.iloc[victorious_commander_row, round_index]
+    defeated_commander = '[COMMANDER]' + df.iloc[defeated_commander_row, round_index]
+
+    victorious_commander_rating = trueskill.Rating()
+    if victorious_commander in ratings:
+        victorious_commander_rating = ratings[victorious_commander]
+    else:
+        ratings[victorious_commander] = victorious_commander_rating
+
+    defeated_commander_rating = trueskill.Rating()
+    if defeated_commander in ratings:
+        defeated_commander_rating = ratings[defeated_commander]
+    else:
+        ratings[defeated_commander] = defeated_commander_rating
 
     for player_index in range(commander_column_pos[1],
                               commander_column_pos[1] + commanders.size):
@@ -89,8 +99,11 @@ for round_no, round_index in enumerate(rounds_indexes):
 
     victor_team_ratings = [
         ratings[i] if i in ratings else trueskill.Rating() for i in victor_team]
+    victor_team_ratings.append(victorious_commander_rating)
+
     looser_team_ratings = [
         ratings[i] if i in ratings else trueskill.Rating() for i in looser_team]
+    looser_team_ratings.append(defeated_commander_rating)
 
     victor_team_ratings, looser_team_ratings = trueskill.rate([victor_team_ratings,
                                                                looser_team_ratings],
@@ -98,9 +111,11 @@ for round_no, round_index in enumerate(rounds_indexes):
 
     for player, rating in zip(victor_team, victor_team_ratings):
         ratings[player] = rating
+    ratings[victorious_commander] = victor_team_ratings[-1]
 
     for player, rating in zip(looser_team, looser_team_ratings):
         ratings[player] = rating
+    ratings[defeated_commander] = looser_team_ratings[-1]
 
     mu_dict = {}
     sigma_dict = {}
@@ -109,15 +124,14 @@ for round_no, round_index in enumerate(rounds_indexes):
         mu_dict[player] = rating.mu
         sigma_dict[player] = rating.sigma
 
-    output_table_mu.append(('mu' + str(round_no + 1), mu_dict))
-    output_table_sigma.append(('sigma' + str(round_no + 1), sigma_dict))
+    ratings_history.append((round_no, mu_dict, sigma_dict))
 
 # reverse order
-output_table = {}
-for mu, sigma in zip(reversed(output_table_mu), reversed(output_table_sigma)):
-    output_table[mu[0]] = mu[1]
-    output_table[sigma[0]] = sigma[1]
+output_dict = {}
+for round_no, mu, sigma in reversed(ratings_history):
+    output_dict[f'mu{round_no}'] = mu
+    output_dict[f'sigma{round_no}'] = sigma
 
-table = pd.DataFrame.from_dict(output_table)
+table = pd.DataFrame.from_dict(output_dict)
 
 table.to_excel(OUTPUT_FILENAME)
