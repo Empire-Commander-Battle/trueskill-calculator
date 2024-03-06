@@ -8,4 +8,5 @@
 			   (specifications->packages
 			    (list "python"
 				  "python-pandas"
-				  "python-odfpy"))))
+				  "python-odfpy"
+				  "python-matplotlib"))))
