@@ -20,12 +20,12 @@ def existing_path(path):
 
 parser.add_argument('recordfile',
                     type=lambda x: existing_path(file_path(x)))
-parser.add_argument('scores', type=file_path)
+parser.add_argument('scorefile', type=file_path)
 
 args = parser.parse_args()
 
 INPUT_FILENAME = args.recordfile
-OUTPUT_FILENAME = args.scores
+OUTPUT_FILENAME = args.scorefile
 
 # MAIN
 
