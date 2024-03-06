@@ -32,10 +32,17 @@ OUTPUT_FILENAME = args.scorefile
 
 # MAIN
 
+# adjust trueskill to 1000
+env = trueskill.TrueSkill(mu=1000, sigma=1000/3)
+env.make_as_global()
+
 df = pd.read_excel(INPUT_FILENAME, header=None, sheet_name='Internal')
 
 rounds_row_pos = (7, 8)
 commander_column_pos = (0, 8)
+
+victorious_commander_row = 4
+defeated_commander_row = 5
 
 rounds = df.iloc[rounds_row_pos[0]][rounds_row_pos[1]:]
 events = list(rounds.index[rounds == 'R1'])
@@ -62,9 +69,12 @@ for round_no, round_index in enumerate(rounds_indexes):
 
     draw = False
 
+    victorious_commander = df.iloc[victorious_commander_row, round_index]
+    defeated_commander = df.iloc[defeated_commander_row, round_index]
+
     for player_index in range(commander_column_pos[1],
                               commander_column_pos[1] + commanders.size):
-        match df[round_index][player_index]:
+        match df.iloc[player_index, round_index]:
             case 1:
                 victor_team.append(commanders[player_index])
             case 0:
