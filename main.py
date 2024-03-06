@@ -8,18 +8,21 @@ parser = argparse.ArgumentParser(
     prog='trueskill',
     description='Calculates trueskill scores from record files')
 
+
 def file_path(path):
-    if os.path.isfile(path):
+    if path != '' and path[-1] != os.sep:
         return path
     raise argparse.ArgumentTypeError(f'{path} is not a valid file path')
 
-def existing_path(path):
-    if os.path.exists(path):
+
+def existing_file_path(path):
+    if os.path.isfile(path):
         return path
     raise argparse.ArgumentTypeError(f'{path} does\' exist')
 
+
 parser.add_argument('recordfile',
-                    type=lambda x: existing_path(file_path(x)))
+                    type=existing_file_path)
 parser.add_argument('scorefile', type=file_path)
 
 args = parser.parse_args()
@@ -43,7 +46,8 @@ rounds_indexes = [list(range(start, end, 2))
                                         events[1:] + [row_end])]
 
 # sort indexes so they are in chronological order
-rounds_indexes = [round_index for event_rounds in reversed(rounds_indexes) for round_index in event_rounds]
+rounds_indexes = [round_index for event_rounds in reversed(
+    rounds_indexes) for round_index in event_rounds]
 
 commanders = df[commander_column_pos[0]][commander_column_pos[1]:]
 
@@ -73,9 +77,10 @@ for round_no, round_index in enumerate(rounds_indexes):
                     case '2':
                         victor_team.append(commanders[player_index])
 
-
-    victor_team_ratings = [ratings[i] if i in ratings else trueskill.Rating() for i in victor_team]
-    looser_team_ratings = [ratings[i] if i in ratings else trueskill.Rating() for i in looser_team]
+    victor_team_ratings = [
+        ratings[i] if i in ratings else trueskill.Rating() for i in victor_team]
+    looser_team_ratings = [
+        ratings[i] if i in ratings else trueskill.Rating() for i in looser_team]
 
     victor_team_ratings, looser_team_ratings = trueskill.rate([victor_team_ratings,
                                                                looser_team_ratings],

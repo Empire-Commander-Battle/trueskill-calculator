@@ -10,19 +10,19 @@ parser = argparse.ArgumentParser(
 
 
 def file_path(path):
-    if os.path.isfile(path):
+    if path != '' and path[-1] != os.sep:
         return path
     raise argparse.ArgumentTypeError(f'{path} is not a valid file path')
 
 
-def existing_path(path):
-    if os.path.exists(path):
+def existing_file_path(path):
+    if os.path.isfile(path):
         return path
     raise argparse.ArgumentTypeError(f'{path} does\' exist')
 
 
 parser.add_argument('scorefile',
-                    type=lambda x: existing_path(file_path(x)))
+                    type=existing_file_path)
 parser.add_argument('outputfile',
                     type=file_path)
 parser.add_argument('-d', '--dpi',
