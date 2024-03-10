@@ -1,1 +1,11 @@
-/home/maciej/.direnvrc
+DEFAULT_PACKAGES=(bash direnv coreutils findutils grep less guix sudo gnupg pinentry git gawk man-db openssh)
+
+use_guix() {
+    if [ -v GUIX_CHANNELS ];
+    then echo "var is unset";
+	 eval $(guix time-machine -C $GUIX_CHANNELS -- shell -E TERM -E DISPLAY --search-paths --pure ${DEFAULT_PACKAGES[@]} "$@")
+    else
+	eval $(guix shell -E TERM -E DISPLAY --search-paths --pure ${DEFAULT_PACKAGES[@]} "$@")
+    fi
+
+}
