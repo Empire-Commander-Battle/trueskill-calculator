@@ -1,6 +1,8 @@
 import trueskill
 import pandas as pd
 
+import re
+
 import os
 import argparse
 
@@ -38,29 +40,31 @@ env.make_as_global()
 
 df = pd.read_excel(INPUT_FILENAME, header=None, sheet_name='All', dtype=str)
 
-rounds_row_pos = (7, 8)
-commander_column_pos = (0, 8)
+rounds_row_pos = (7, 12)
+event_type_row_pos = (7, 0)
+commander_col_pos = (0, 13)
 
-victorious_commander_row = 5
-defeated_commander_row = 6
+victorious_commander_row = 10
+defeated_commander_row = 11
 
-rounds = df.iloc[rounds_row_pos[0]][rounds_row_pos[1]:]
-events = list(rounds.index[rounds == 'R1'])
-row_end = rounds.index[rounds == 'Type'][-1] + 1
+event_type_row = df.iloc[event_type_row_pos[1], event_type_row_pos[0]:]
+rounds_row = df.iloc[rounds_row_pos[1], rounds_row_pos[0]:]
 
-rounds_indexes = [list(range(start, end, 2))
-                  for start, end in zip(events + [row_end],
-                                        events[1:] + [row_end])]
+rounds_mask = rounds_row.apply(lambda x: isinstance(x, str) and re.match('R\d', x) is not None)
+rounds_indexes = rounds_row.index[rounds_mask]
+rounds_indexes = [i for i in reversed(rounds_indexes) if event_type_row[i] == 'Internal']
 
-# sort indexes so they are in chronological order
-rounds_indexes = [round_index for event_rounds in reversed(
-    rounds_indexes) for round_index in event_rounds]
+for last_index in range(commander_col_pos[1], df.iloc[:, commander_col_pos[0]].size):
+    if isinstance(df.iloc[last_index, commander_col_pos[0]], str):
+        continue
+    break
 
-commanders = df[commander_column_pos[0]][commander_column_pos[1]:]
+commanders = df.iloc[commander_col_pos[1]:last_index, commander_col_pos[0]]
 
 ratings_history = []
 ratings = {}
 
+print(rounds_indexes)
 for round_no, round_index in enumerate(rounds_indexes):
     victor_team = []
     looser_team = []
@@ -85,21 +89,21 @@ for round_no, round_index in enumerate(rounds_indexes):
     else:
         ratings[defeated_commander] = defeated_commander_rating
 
-    for player_index in range(commander_column_pos[1],
-                              commander_column_pos[1] + commanders.size):
-        player_name = df.iloc[player_index, commander_column_pos[0]]
+    for player_index in range(commander_col_pos[1],
+                              commander_col_pos[1] + commanders.size):
+        player_name = df.iloc[player_index, commander_col_pos[0]]
         if player_name in (victorious_commander_name,
                            defeated_commander_name):
             continue
 
-        match df.iloc[player_index, round_index]:
+        match df.iloc[player_index, round_index - 1]:
             case '1':
                 victor_team.append(commanders[player_index])
             case '0':
                 looser_team.append(commanders[player_index])
             case '0.5':
                 draw = True
-                match df[round_index + 1][player_index][0]:
+                match df.iloc[player_index, round_index][0]:
                     case '1':
                         looser_team.append(commanders[player_index])
                     case '2':
