@@ -36,7 +36,7 @@ OUTPUT_FILENAME = args.scorefile
 env = trueskill.TrueSkill(mu=1000, sigma=1000/3)
 env.make_as_global()
 
-df = pd.read_excel(INPUT_FILENAME, header=None, sheet_name='Internal')
+df = pd.read_excel(INPUT_FILENAME, header=None, sheet_name='All', dtype=str)
 
 rounds_row_pos = (7, 8)
 commander_column_pos = (0, 8)
@@ -67,8 +67,11 @@ for round_no, round_index in enumerate(rounds_indexes):
 
     draw = False
 
-    victorious_commander = '[COMMANDER]' + df.iloc[victorious_commander_row, round_index]
-    defeated_commander = '[COMMANDER]' + df.iloc[defeated_commander_row, round_index]
+    victorious_commander_name = df.iloc[victorious_commander_row, round_index]
+    defeated_commander_name = df.iloc[defeated_commander_row, round_index]
+
+    victorious_commander = 'COMMANDER|' +  victorious_commander_name
+    defeated_commander = 'COMMANDER|' + defeated_commander_name
 
     victorious_commander_rating = trueskill.Rating()
     if victorious_commander in ratings:
@@ -84,12 +87,17 @@ for round_no, round_index in enumerate(rounds_indexes):
 
     for player_index in range(commander_column_pos[1],
                               commander_column_pos[1] + commanders.size):
+        player_name = df.iloc[player_index, commander_column_pos[0]]
+        if player_name in (victorious_commander_name,
+                           defeated_commander_name):
+            continue
+
         match df.iloc[player_index, round_index]:
-            case 1:
+            case '1':
                 victor_team.append(commanders[player_index])
-            case 0:
+            case '0':
                 looser_team.append(commanders[player_index])
-            case 0.5:
+            case '0.5':
                 draw = True
                 match df[round_index + 1][player_index][0]:
                     case '1':
