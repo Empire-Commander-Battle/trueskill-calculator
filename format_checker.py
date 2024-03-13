@@ -173,7 +173,7 @@ try:
                                               'round no': round_no,
                                               'last round no': last_round_no})
             else:
-                print_warning('skipping consecutivness check due to last round not passing')
+                print_warning(f'{to_abc(round_index)} skipping consecutivness check due to last round not passing')
 
             with Check('survivor percent'):
                 survivor_percent = df.iloc[survivor_percent_row, round_index]
