@@ -18,9 +18,13 @@ parser = argparse.ArgumentParser(
 parser.add_argument('recordfile',
                     type=existing_file_path)
 
+parser.add_argument('-v', '--verbose',
+                    action='store_true')
+
 args = parser.parse_args()
 
 INPUT_FILENAME = args.recordfile
+VERBOSE = args.verbose
 
 # CLASSES
 
@@ -42,18 +46,29 @@ def parametize_exception_class(cls, to_add):
 
     return FormatException
 
+def print_format_exception(expt):
+    print(cr.Fore.YELLOW + f'REASON: {cr.Fore.WHITE}{e.reason}')
+    for name, val in e.data.items():
+        print(cr.Fore.MAGENTA + f'{name}: ' + cr.Style.RESET_ALL, end='')
+        pprint.pprint(val)
+
 class Check:
     def __init__(self, name):
         self.name = name
 
     def __enter__(self):
-        print(cr.Fore.BLUE + f'{self.name} check: ', end='')
+        if VERBOSE:
+            print(cr.Fore.BLUE + f'{self.name} check: ', end='')
 
     def __exit__(self, exc_type, exc_value, ext_tb):
-        if exc_type is None:
-            print(cr.Fore.GREEN + 'PASSED')
-        else:
-            print(cr.Fore.RED + 'FAILED')
+        if VERBOSE:
+            if exc_type is None:
+                print(cr.Fore.GREEN + 'PASSED')
+            else:
+                print(cr.Fore.RED + 'FAILED')
+
+def print_warning(msg):
+    print(cr.Fore.YELLOW + f'WARNING: {msg}')
 
 class Result(enum.Enum):
     UNDEF = 0
@@ -98,10 +113,10 @@ try:
     rounds_row = df.iloc[rounds_row_pos[1], rounds_row_pos[0]:]
 
     rounds_mask = rounds_row.apply(lambda x: isinstance(x, str) and re.match('^R\d+$', x) is not None)
-    rounds_indexes = rounds_row.index[rounds_mask]
+    rounds_indexes = list(rounds_row.index[rounds_mask])
 
     with Check('at least one round'):
-        if rounds_indexes.size == 0:
+        if len(rounds_indexes) == 0:
             raise FormatException('couldn\'t find any rounds')
 
     for last_index in range(commander_col_pos[1], df.iloc[:, commander_col_pos[0]].size):
@@ -119,145 +134,162 @@ try:
             raise FormatException('non unique commanders',
                                   {'repeating commanders': tmp})
 
-    last_round_index = rounds_indexes[0] - 2
+    last_round_passed = True
     last_event_type = None
     last_round_no = None
-    for round_index in rounds_indexes:
-        RoundException = parametize_exception_class(FormatException,
-                                                    {'round index': to_abc(round_index)})
 
-        with Check('space'):
-            if round_index - last_round_index < 2:
-                raise RoundException('need at least 1 cell space between rounds',
-                                     {'last round index': last_round_index})
+    round_exceptions = []
 
-        with Check('date'):
-            date = df.iloc[date_row, round_index]
-            if not isinstance(date, str):
-                raise RoundException('date is empty',)
+    for last_round_index, round_index in zip([rounds_indexes[0] - 2] + rounds_indexes, rounds_indexes):
+        try:
+            RoundException = parametize_exception_class(FormatException,
+                                                        {'round index': to_abc(round_index)})
 
-        event_type = df.iloc[event_type_row_pos[1], round_index]
+            with Check('space'):
+                if round_index - last_round_index < 2:
+                    raise RoundException('need at least 1 cell space between rounds',
+                                        {'last round index': last_round_index})
 
-        with Check('event type'):
-            if not isinstance(event_type, str):
-                raise RoundException('event type is empty')
+            with Check('date'):
+                date = df.iloc[date_row, round_index]
+                if not isinstance(date, str):
+                    raise RoundException('date is empty',)
 
-        name = df.iloc[rounds_row_pos[1], round_index]
-        round_no = int(name[1:])
+            event_type = df.iloc[event_type_row_pos[1], round_index]
 
-        with Check('consecutiveness'):
-            if event_type == last_event_type and round_no - last_round_no != -1:
-                raise RoundException('there is gap between round numbers',
-                                     {'event type': event_type,
-                                      'last event type': last_event_type,
-                                      'round no': round_no,
-                                      'last round no': last_round_no})
+            with Check('event type'):
+                if not isinstance(event_type, str):
+                    raise RoundException('event type is empty')
 
-        victorious_commander = df.iloc[victorious_commander_row, round_index]
-        if not isinstance(victorious_commander, str):
-            victorious_commander = None
+            name = df.iloc[rounds_row_pos[1], round_index]
+            round_no = int(name[1:])
 
-        defeated_commander = df.iloc[defeated_commander_row, round_index]
-        if not isinstance(defeated_commander, str):
-            defeated_commander = None
+            if last_round_passed:
+                with Check('consecutiveness'):
+                    if event_type == last_event_type and round_no - last_round_no != -1:
+                        raise RoundException('there is gap between round numbers',
+                                             {'event type': event_type,
+                                              'last event type': last_event_type,
+                                              'round no': round_no,
+                                              'last round no': last_round_no})
+            else:
+                print_warning('skipping consecutivness check due to last round not passing')
 
-        victor_team = []
-        looser_team = []
+            victorious_commander = df.iloc[victorious_commander_row, round_index]
+            if not isinstance(victorious_commander, str):
+                victorious_commander = None
 
-        round_result = Result.UNDEF
+            defeated_commander = df.iloc[defeated_commander_row, round_index]
+            if not isinstance(defeated_commander, str):
+                defeated_commander = None
 
-        for player_index in range(commander_col_pos[1],
-                                commander_col_pos[1] + commanders.size):
-            player_name = df.iloc[player_index, commander_col_pos[0]]
+            victor_team = []
+            looser_team = []
 
-            PlayerException = parametize_exception_class(RoundException,
-                                                         {'player index': player_index + 1,
-                                                          'player name': player_name})
+            round_result = Result.UNDEF
 
-            data = df.iloc[player_index, round_index]
-            if not isinstance(data, str):
-                continue
+            for player_index in range(commander_col_pos[1],
+                                    commander_col_pos[1] + commanders.size):
+                player_name = df.iloc[player_index, commander_col_pos[0]]
 
-            with Check('data format'):
-                if len(data) < 1:
-                    raise PlayerException('data is empty string')
+                PlayerException = parametize_exception_class(RoundException,
+                                                            {'player index': player_index + 1,
+                                                            'player name': player_name})
 
-            with Check('team'):
-                if data[0] != '1' and data[0] != '2':
-                    raise PlayerException('data doesn\'t start with proper team number - 1 or 2',
-                                          {'data': data})
+                data = df.iloc[player_index, round_index]
+                if not isinstance(data, str):
+                    continue
 
-            team_no = int(data[0])
+                if data == '?':
+                    continue
 
-            round_result_in = Result.UNDEF
-            with Check('W/L check'):
-                value = df.iloc[player_index, round_index - 1]
-                match value:
-                    case '1':
-                        round_result_in = Result.team_to_result(team_no)
-                        victor_team.append(player_name)
-                    case '0':
-                        round_result_in = Result.team_to_opposite_result(team_no)
-                        looser_team.append(player_name)
-                    case '0.5':
-                        round_result_in = Result.DRAW
-                        match team_no:
-                            case 1:
-                                looser_team.append(player_name)
-                            case 2:
-                                victor_team.append(player_name)
-                    case _:
-                        raise PlayerException('W/L cell with invalid value',
-                                              {'value': value})
+                with Check('data format'):
+                    if len(data) < 1:
+                        raise PlayerException('data is empty string')
 
-            with Check('round result'):
-                if round_result == Result.UNDEF:
-                    round_result = round_result_in
-                else:
-                    if round_result != round_result_in:
-                        raise PlayerException('conflicting victory inference',
-                                              {'round result': round_result,
-                                               'infered round result': round_result_in})
+                with Check('team'):
+                    if data[0] != '1' and data[0] != '2':
+                        raise PlayerException('data doesn\'t start with proper team number - 1 or 2',
+                                            {'data': data})
 
-        with Check('Victorious commander on looser team'):
-            if victorious_commander is not None and victorious_commander in looser_team:
-                raise RoundException('victorious commander is on looser team',
-                                     {'victor team': victor_team,
-                                      'looser team': looser_team,
-                                      'victorious commander': victorious_commander,
-                                      'defeated commander': defeated_commander})
+                team_no = int(data[0])
 
-        with Check('Defeated commander on victor team'):
-            if defeated_commander is not None and defeated_commander in victor_team:
-                raise RoundException('victorious commander is on looser team',
-                                     {'victor team': victor_team,
-                                      'looser team': looser_team,
-                                      'victorious commander': victorious_commander,
-                                      'defeated commander': defeated_commander})
+                round_result_in = Result.UNDEF
+                with Check('W/L check'):
+                    value = df.iloc[player_index, round_index - 1]
+                    match value:
+                        case '1':
+                            round_result_in = Result.team_to_result(team_no)
+                            victor_team.append(player_name)
+                        case '0':
+                            round_result_in = Result.team_to_opposite_result(team_no)
+                            looser_team.append(player_name)
+                        case '0.5':
+                            round_result_in = Result.DRAW
+                            match team_no:
+                                case 1:
+                                    looser_team.append(player_name)
+                                case 2:
+                                    victor_team.append(player_name)
+                        case _:
+                            raise PlayerException('W/L cell with invalid value',
+                                                {'value': value})
 
-        with Check('Victor team player number'):
-            if len(victor_team) == 0 and victorious_commander == None:
-                raise RoundException('victor team does have no players',
-                                     {'victor team': victor_team,
-                                      'looser team': looser_team,
-                                      'victorious commander': victorious_commander,
-                                      'defeated commander': defeated_commander})
+                with Check('round result'):
+                    if round_result == Result.UNDEF:
+                        round_result = round_result_in
+                    else:
+                        if round_result != round_result_in:
+                            raise PlayerException('conflicting victory inference',
+                                                {'round result': round_result,
+                                                'infered round result': round_result_in})
 
-        with Check('Looser team player number'):
-            if len(looser_team) == 0 and defeated_commander == None:
-                raise RoundException('looser team does have no players',
-                                     {'victor team': victor_team,
-                                      'looser team': looser_team,
-                                      'victorious commander': victorious_commander,
-                                      'defeated commander': defeated_commander})
+            with Check('Victorious commander on looser team'):
+                if victorious_commander is not None and victorious_commander in looser_team:
+                    raise RoundException('victorious commander is on looser team',
+                                        {'victor team': victor_team,
+                                        'looser team': looser_team,
+                                        'victorious commander': victorious_commander,
+                                        'defeated commander': defeated_commander})
 
-        last_round_index = round_index
-        last_event_type = event_type
-        last_round_no = round_no
+            with Check('Defeated commander on victor team'):
+                if defeated_commander is not None and defeated_commander in victor_team:
+                    raise RoundException('victorious commander is on looser team',
+                                        {'victor team': victor_team,
+                                        'looser team': looser_team,
+                                        'victorious commander': victorious_commander,
+                                        'defeated commander': defeated_commander})
+
+            with Check('Victor team player number'):
+                if len(victor_team) == 0 and victorious_commander == None:
+                    raise RoundException('victor team does have no players',
+                                        {'victor team': victor_team,
+                                        'looser team': looser_team,
+                                        'victorious commander': victorious_commander,
+                                        'defeated commander': defeated_commander})
+
+            with Check('Looser team player number'):
+                if len(looser_team) == 0 and defeated_commander == None:
+                    raise RoundException('looser team does have no players',
+                                        {'victor team': victor_team,
+                                        'looser team': looser_team,
+                                        'victorious commander': victorious_commander,
+                                        'defeated commander': defeated_commander})
+
+            last_event_type = event_type
+            last_round_no = round_no
+            last_round_passed = True
+        except FormatException as e:
+            last_round_passed = False
+            round_exceptions.append(e)
+
+    if len(round_exceptions) == 0:
+        print(cr.Fore.GREEN + 'FILE PASSED SUECSSFULLY')
+    else:
+        for e in round_exceptions:
+            print_format_exception(e)
+
 except FormatException as e:
-    print(cr.Fore.YELLOW + f'REASON: {cr.Fore.WHITE}{e.reason}')
-    for name, val in e.data.items():
-        print(cr.Fore.MAGENTA + f'{name}: ' + cr.Style.RESET_ALL, end='')
-        pprint.pprint(val)
+    print_format_exception(e)
 finally:
     print(cr.Style.RESET_ALL, end='')

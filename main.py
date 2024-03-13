@@ -52,7 +52,6 @@ class Commander:
         self.player_name = player_name
         self.rating = get_rating_f(self.name)
 
-print(rounds_indexes)
 for round_no, round_index in enumerate(rounds_indexes):
     event_type = df.iloc[event_type_row_pos[1], round_index]
 
@@ -77,19 +76,17 @@ for round_no, round_index in enumerate(rounds_indexes):
     victorious_commander = None
     if isinstance(df.iloc[victorious_commander_row, round_index], str):
         victorious_commander = Commander(df.iloc[victorious_commander_row, round_index], get_rating)
-        print(victorious_commander.name)
         blacklist.append(victorious_commander.player_name)
 
     defeated_commander = None
     if isinstance(df.iloc[defeated_commander_row, round_index], str):
         defeated_commander = Commander(df.iloc[defeated_commander_row, round_index], get_rating)
-        print(defeated_commander.name)
         blacklist.append(defeated_commander.player_name)
 
     for player_index in range(commander_col_pos[1],
                               commander_col_pos[1] + commanders.size):
         player_name = df.iloc[player_index, commander_col_pos[0]]
-        if player_name in blacklist:
+        if player_name in blacklist or df.iloc[player_index, round_index] == '?':
             continue
 
         match df.iloc[player_index, round_index - 1]:
