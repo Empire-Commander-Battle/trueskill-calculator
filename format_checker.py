@@ -175,6 +175,22 @@ try:
             else:
                 print_warning('skipping consecutivness check due to last round not passing')
 
+            with Check('survivor percent'):
+                survivor_percent = df.iloc[survivor_percent_row, round_index]
+                if not isinstance(survivor_percent, str):
+                    raise RoundException('survivor count is empty')
+
+                try:
+                    survivor_percent = float(survivor_percent)
+                except ValueError:
+                    raise RoundException('survivor count is not an number')
+
+                if survivor_percent <= 0:
+                    raise RoundException('survivor count <= 0')
+
+                if survivor_percent > 1:
+                    raise RundException('survivor count > 1')
+
             victorious_commander = df.iloc[victorious_commander_row, round_index]
             if not isinstance(victorious_commander, str):
                 victorious_commander = None
