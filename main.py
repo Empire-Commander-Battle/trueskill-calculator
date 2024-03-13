@@ -4,25 +4,13 @@ import pandas as pd
 
 import re
 
-import os
 import argparse
+
+from shared import *
 
 parser = argparse.ArgumentParser(
     prog='trueskill',
     description='Calculates trueskill scores from record files')
-
-
-def file_path(path):
-    if path != '' and path[-1] != os.sep:
-        return path
-    raise argparse.ArgumentTypeError(f'{path} is not a valid file path')
-
-
-def existing_file_path(path):
-    if os.path.isfile(path):
-        return path
-    raise argparse.ArgumentTypeError(f'{path} does\' exist')
-
 
 parser.add_argument('recordfile',
                     type=existing_file_path)
@@ -41,16 +29,9 @@ env.make_as_global()
 
 df = pd.read_excel(INPUT_FILENAME, header=None, sheet_name='All', dtype=str)
 
-rounds_row_pos = (7, 12)
-event_type_row_pos = (7, 0)
-commander_col_pos = (0, 13)
-
-victorious_commander_row = 10
-defeated_commander_row = 11
-
 rounds_row = df.iloc[rounds_row_pos[1], rounds_row_pos[0]:]
 
-rounds_mask = rounds_row.apply(lambda x: isinstance(x, str) and re.match('R\d', x) is not None)
+rounds_mask = rounds_row.apply(lambda x: isinstance(x, str) and re.match('^R\d$', x) is not None)
 rounds_indexes = rounds_row.index[rounds_mask]
 rounds_indexes = list(reversed(rounds_indexes))
 
@@ -93,10 +74,6 @@ for round_no, round_index in enumerate(rounds_indexes):
     draw = False
     blacklist = []
 
-    print(df.iloc[victorious_commander_row, round_index])
-    print(df.iloc[defeated_commander_row, round_index])
-
-
     victorious_commander = None
     if isinstance(df.iloc[victorious_commander_row, round_index], str):
         victorious_commander = Commander(df.iloc[victorious_commander_row, round_index], get_rating)
@@ -117,16 +94,16 @@ for round_no, round_index in enumerate(rounds_indexes):
 
         match df.iloc[player_index, round_index - 1]:
             case '1':
-                victor_team.append(commanders[player_index])
+                victor_team.append(player_name)
             case '0':
-                looser_team.append(commanders[player_index])
+                looser_team.append(player_name)
             case '0.5':
                 draw = True
                 match df.iloc[player_index, round_index][0]:
                     case '1':
-                        looser_team.append(commanders[player_index])
+                        looser_team.append(player_name)
                     case '2':
-                        victor_team.append(commanders[player_index])
+                        victor_team.append(player_name)
 
     victor_team_ratings = [get_rating(i) for i in victor_team]
 

@@ -5,8 +5,10 @@
 (load "trueskill.scm")
 
 (packages->manifest (cons* python-trueskill
-			   (specifications->packages
-			    (list "python"
-				  "python-pandas"
-				  "python-odfpy"
-				  "python-matplotlib"))))
+						   (specifications->packages
+							(list "python"
+								  "python-pandas"
+								  "python-odfpy"
+								  "python-matplotlib"
+								  "python-colorama"
+								  "python-mpmath"))))
